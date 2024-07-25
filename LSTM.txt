@@ -1,0 +1,47 @@
+import pandas as pd
+from sklearn.preprocessing import LabelEncoder
+from tensorflow.keras.models import Sequential, save_model, load_model
+from tensorflow.keras.layers import Embedding, LSTM, Dense
+from tensorflow.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+
+dataset = pd.read_csv('imdb.csv')
+
+tokenizer = Tokenizer()
+tokenizer.fit_on_texts(dataset['review'])
+vocab_size = len(tokenizer.word_index) + 1
+
+max_length = 100
+X = tokenizer.texts_to_sequences(dataset['review'])
+X = pad_sequences(X, maxlen=max_length)
+
+label_encoder = LabelEncoder()
+y = label_encoder.fit_transform(dataset['sentiment'])
+
+model_file = 'sentiment_model.h5'
+
+try:
+    model = load_model(model_file)
+    
+except (OSError, IOError):
+    model = Sequential()
+    model.add(Embedding(vocab_size, 100, input_length=max_length))
+    model.add(LSTM(128))
+    model.add(Dense(1, activation='sigmoid'))
+    model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+    model.fit(X, y, batch_size=32, epochs=10)
+    save_model(model, model_file)
+
+def predict_sentiment(review):
+    review_seq = tokenizer.texts_to_sequences([review])
+    review_seq = pad_sequences(review_seq, maxlen=max_length)
+
+    prediction = model.predict(review_seq)[0][0]
+    if prediction >= 0.7:
+        return 'positive'
+    else:
+        return 'negative'
+
+input_review = input("Enter review: ")
+predicted_sentiment = predict_sentiment(input_review)
+print("Predicted sentiment:", predicted_sentiment)
